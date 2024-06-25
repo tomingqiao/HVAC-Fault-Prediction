@@ -1,0 +1,9 @@
+docutils
+docxcompose
+pandas
+python-docx
+matplotlib
+argparse
+pytest
+click
+streamlit
