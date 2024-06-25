@@ -1,7 +1,0 @@
-ahu_scr.csv
-https://github.com/sassoftware/iot-anomaly-detection-hvac/blob/master/data/ahu_train.csv
-
-
-MZVAV-1.csv
-Starter: LBNL Automated Fault Detection 4acac33e-2
-https://www.kaggle.com/code/kerneler/starter-lbnl-automated-fault-detection-4acac33e-2
