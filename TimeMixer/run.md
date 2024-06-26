@@ -317,7 +317,7 @@
 
 ### .sh文件命令行参数示例
 
-```a
+```shell
 
 export CUDA_VISIBLE_DEVICES=0
 
@@ -435,3 +435,127 @@ python -u run.py \
   --down_sampling_method avg \
   --down_sampling_window $down_sampling_window
 ```
+
+#### 这个代码片段主要用于执行一个时间序列预测任务，使用的是 `TimeMixer` 模型，并通过命令行传递各种参数配置。以下是对每个部分的详细分析
+
+### 设置环境变量
+
+1. `export CUDA_VISIBLE_DEVICES=0`：
+   - 设置使用哪块 GPU 进行训练，这里指定为第 0 块 GPU。
+
+### 定义参数变量
+
+2. 定义一些模型训练和配置的参数变量：
+   - `model_name=TimeMixer`：模型名称。
+   - `seq_len=96`：输入序列的长度。
+   - `e_layers=2`：编码器层数。
+   - `down_sampling_layers=3`：下采样层数。
+   - `down_sampling_window=2`：下采样窗口大小。
+   - `learning_rate=0.01`：学习率。
+   - `d_model=16`：模型的维度。
+   - `d_ff=32`：全连接层的维度。
+   - `batch_size=16`：批量大小。
+
+### 运行 Python 脚本
+
+3. 使用 `python -u run.py` 运行 Python 脚本，并传递各种参数配置：
+
+   ```shell
+   python -u run.py \
+     --task_name long_term_forecast \
+     --is_training 1 \
+     --root_path  ./dataset/ETT-small/\
+     --data_path ETTm1.csv \
+     --model_id ETTm1_$seq_len'_'96 \
+     --model $model_name \
+     --data ETTm1 \
+     --features M \
+     --seq_len $seq_len \
+     --label_len 0 \
+     --pred_len 96 \
+     --e_layers $e_layers \
+     --enc_in 7 \
+     --c_out 7 \
+     --des 'Exp' \
+     --itr 1 \
+     --d_model $d_model \
+     --d_ff $d_ff \
+     --batch_size $batch_size \
+     --learning_rate $learning_rate \
+     --down_sampling_layers $down_sampling_layers \
+     --down_sampling_method avg \
+     --down_sampling_window $down_sampling_window
+   ```
+
+### 参数说明
+
+1. `--task_name long_term_forecast`：
+   - 任务名称为长期预测。
+
+2. `--is_training 1`：
+   - 指定为训练模式。
+
+3. `--root_path ./dataset/ETT-small/`：
+   - 数据集的根路径。
+
+4. `--data_path ETTm1.csv`：
+   - 数据文件名。
+
+5. `--model_id ETTm1_$seq_len'_'96`：
+   - 模型 ID，包含数据集名称和序列长度。
+
+6. `--model $model_name`：
+   - 模型名称，这里使用的是 `TimeMixer`。
+
+7. `--data ETTm1`：
+   - 数据集名称。
+
+8. `--features M`：
+   - 预测任务类型为多变量预测多变量。
+
+9. `--seq_len $seq_len`：
+   - 输入序列长度为 96。
+
+10. `--label_len 0`：
+    - 开始标记的长度为 0。
+
+11. `--pred_len 96`：
+    - 预测序列长度为 96。
+
+12. `--e_layers $e_layers`：
+    - 编码器层数为 2。
+
+13. `--enc_in 7`：
+    - 编码器输入尺寸为 7。
+
+14. `--c_out 7`：
+    - 输出尺寸为 7。
+
+15. `--des 'Exp'`：
+    - 实验描述。
+
+16. `--itr 1`：
+    - 实验次数为 1。
+
+17. `--d_model $d_model`：
+    - 模型的维度为 16。
+
+18. `--d_ff $d_ff`：
+    - 全连接层的维度为 32。
+
+19. `--batch_size $batch_size`：
+    - 批量大小为 16。
+
+20. `--learning_rate $learning_rate`：
+    - 学习率为 0.01。
+
+21. `--down_sampling_layers $down_sampling_layers`：
+    - 下采样层数为 3。
+
+22. `--down_sampling_method avg`：
+    - 下采样方法为平均采样。
+
+23. `--down_sampling_window $down_sampling_window`：
+    - 下采样窗口大小为 2。
+
+以上代码和参数设置将使模型在指定的数据集上进行长期时间序列预测任务，并保存训练结果和模型检查点。
