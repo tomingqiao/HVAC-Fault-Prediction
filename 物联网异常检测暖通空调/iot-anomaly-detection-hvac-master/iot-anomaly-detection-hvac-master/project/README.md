@@ -1,1 +1,0 @@
-This folder contains reference XML code (anomaly_detection_ahu.xml) for ESP project and ASTORE file (svdd_ahu.astore) from SVDD model.
