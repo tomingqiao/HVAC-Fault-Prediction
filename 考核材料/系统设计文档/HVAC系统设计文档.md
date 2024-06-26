@@ -51,11 +51,65 @@
 
 ## 3. 架构概述
 
+```mermaid
+graph TD
+    subgraph 传感器层
+        TempSensor(温度传感器)
+        HumidSensor(湿度传感器)
+        PressSensor(压力传感器)
+    end
+
+    subgraph 数据采集层
+        Flume[Apache Flume]
+        Kafka[Apache Kafka]
+    end
+
+    subgraph 数据处理与存储层
+        Spark[Apache Spark]
+        HDFS[Hadoop HDFS]
+        BrickModel[Brick 模型]
+        ES[ElasticSearch]
+    end
+
+    subgraph 数据分析层
+        MLlib[Spark MLlib]
+    end
+
+    subgraph 用户界面层
+        Kibana[Kibana]
+        Dashboard[故障预测仪表盘]
+    end
+
+    TempSensor --> Flume
+    HumidSensor --> Flume
+    PressSensor --> Flume
+
+    Flume --> Kafka
+
+    Kafka --> Spark
+
+    Spark --> |使用Brick 模型的语义信息进行数据处理和分析|BrickModel
+    BrickModel --> |数据持久化|HDFS
+
+    ES --> |故障预测|MLlib
+
+	MLlib --> |预测结果| Kibana
+    ES --> |实时数据|Kibana
+
+    HDFS --> |数据索引|ES
+    Kibana --> |数据可视化|Dashboard
+
+    style BrickModel fill:#f9f,stroke:#333,stroke-width:4px
+    classDef BrickClass fill:#f9f,stroke:#333,stroke-width:4px;
+    class BrickModel BrickClass;
+
+```
+
 系统采用分层架构设计，主要包括以下几个层次：
 
 1. **传感器层**：负责采集HVAC设备的实时运行数据。
 2. **数据采集层**：使用Apache Flume和Apache Kafka进行数据采集和传输。
-3. **数据处理与存储层**：基于Apache Spark和Hadoop HDFS进行数据处理和存储。
+3. **数据处理与存储层**：基于Apache Spark和Hadoop HDFS进行数据处理和存储,  使用Elastic Search进行数据检索。
 4. **数据分析层**：利用Spark MLlib进行故障预测和分析。
 5. **用户界面层**：使用Kibana进行数据展示和用户交互。
 
@@ -75,6 +129,7 @@
 
 - **Apache Spark**：用于实时数据处理和分析，支持大规模数据的分布式计算。
 - **Hadoop HDFS**：用于存储大量的传感器数据，提供高可用性和容错性。
+- **Elastic Search**:  用于数据索引和快速检索，优化查询性能。
 
 ### 4.4 数据分析层
 
@@ -89,12 +144,56 @@
 1. **数据采集**：传感器实时采集HVAC设备数据，通过Apache Flume发送到Kafka。
 2. **数据传输**：Kafka将数据传输到Apache Spark进行实时处理。
 3. **数据存储**：处理后的数据存储在Hadoop HDFS中。
-4. **数据分析**：Spark MLlib从HDFS读取数据，进行故障预测分析。
+4. **数据分析**：Spark MLlib从ElasticSearch检索数据，进行故障预测分析。
 5. **数据展示**：分析结果通过Kibana展示给用户。
 
-## 6. 算法选型与比较
+## 6. Brick 模型的理解和植入
+Brick 模型用于标准化和语义化描述HVAC系统中的设备、位置和系统关系。通过Brick模型，可以实现对设备和数据的统一管理和查询。
 
-### 6.1 时间序列分析
+### 6.1 Brick 模型概述
+Brick 模型使用 RDF 和 SPARQL 来描述建筑物内设备、位置、系统和数据的语义关系。以下是 Brick 模型的基本组成：
+
+设备 (Devices)：如温度传感器、湿度传感器等。
+位置 (Locations)：如房间、楼层等。
+系统 (Systems)：如HVAC系统、电力系统等。
+属性 (Attributes)：如温度、湿度等。
+
+### 6.2 Brick 模型在本课题中的应用
+在本课题中，Brick 模型用于描述HVAC系统中的各类设备及其数据。
+
+定义设备和位置：使用 Brick 模型定义 HVAC 系统中的设备和位置。
+数据采集和描述：使用 Brick 模型描述采集到的传感器数据。
+数据处理和分析：使用 Brick 模型的语义信息进行数据处理和分析。
+数据展示：使用 Kibana 结合 Brick 模型实现数据的语义查询和展示。
+
+### 6.3 Brick 模型应用示例
+```turtle
+@prefix brick: <https://brickschema.org/schema/1.0.3/Brick#> .
+@prefix ex: <http://example.com#> .
+
+ex:Building_A a brick:Building ;
+    brick:hasPart ex:Floor_1 .
+
+ex:Floor_1 a brick:Floor ;
+    brick:hasPart ex:Room_101 ;
+    brick:hasPart ex:Room_102 .
+
+ex:Room_101 a brick:Room ;
+    brick:hasPart ex:TempSensor_1 ;
+    brick:hasPart ex:HumidSensor_1 .
+
+ex:TempSensor_1 a brick:Temperature_Sensor ;
+    brick:hasLocation ex:Room_101 ;
+    brick:hasUnit "Celsius" .
+
+ex:HumidSensor_1 a brick:Humidity_Sensor ;
+    brick:hasLocation ex:Room_101 ;
+    brick:hasUnit "Percent" .
+```
+
+## 7. 算法选型与比较
+
+### 7.1 时间序列分析
 
 ```mermaid
 graph TD
@@ -123,7 +222,7 @@ graph TD
 
 - 适用于数据趋势明显且变化相对平稳的场景，如温度、湿度等变化预测。
 
-### 6.2 随机森林
+### 7.2 随机森林
 
 ```mermaid
 graph TD
@@ -135,8 +234,6 @@ graph TD
     end
 
 ```
-
-
 
 
 
@@ -155,7 +252,7 @@ graph TD
 
 - 适用于复杂性较高、特征较多的数据集，尤其是当数据特征之间存在非线性关系时。
 
-### 6.3 梯度提升树（Gradient Boosting Tree, GBT）
+### 7.3 梯度提升树（Gradient Boosting Tree, GBT）
 
 ```mermaid
 graph TD
@@ -187,7 +284,7 @@ graph TD
 
 - 适用于需要高精度预测且能够接受较长训练时间的场景，特别是在数据关系复杂的情况下。
 
-### 6.4 循环神经网络（RNN）
+### 7.4 循环神经网络（RNN）
 
 ```mermaid
 graph TD
@@ -217,7 +314,7 @@ graph TD
 
 - 适用于短期时间序列数据的预测，如短时间内的设备状态变化。
 
-### 6.5 长短期记忆网络（LSTM）
+### 7.5 长短期记忆网络（LSTM）
 
 ```mermaid
 graph TD
@@ -248,7 +345,7 @@ graph TD
 
 - 适用于长时间序列数据的预测，如设备的长期运行状态监测和故障预测。
 
-### 6.6 支持向量数据描述（SVDD）
+### 7.6 支持向量数据描述（SVDD）
 
 ```mermaid
 graph TD
@@ -277,7 +374,7 @@ graph TD
 
 - 适用于设备异常检测和故障预警，特别是在数据量较小的情况下。
 
-### 6.7 选型综述
+### 7.7 选型综述
 
 综合考虑数据特性和系统需求，本HVAC系统需对设备传感器数据进行实时监测和故障预测，数据具有明显的时间序列特性且需要处理长时间的依赖关系。因此，以下几点是算法选型的关键考虑因素：
 
@@ -289,335 +386,216 @@ graph TD
 
 虽然LSTM的训练时间较长且对计算资源要求高，但其带来的高预测准确率和稳定性足以弥补这些不足。因此，建议在本系统中采用LSTM作为主要的故障预测模型，以实现对HVAC设备故障的精准预测和及时预警。
 
-## 7. 系统接口
-
-```mermaid
-graph TD
-    subgraph 传感器层
-        传感器1(温度传感器)
-        传感器2(湿度传感器)
-        传感器3(压力传感器)
-    end
-
-    subgraph 数据采集层
-        Flume[Apache Flume]
-        Kafka[Apache Kafka]
-    end
-
-    subgraph 数据处理与存储层
-        Spark[Apache Spark]
-        HDFS[Hadoop HDFS]
-    end
-
-    subgraph 数据分析层
-        MLlib[Spark MLlib]
-    end
-
-    subgraph 用户界面层
-        Kibana[Kibana]
-    end
-
-    传感器1 --> Flume
-    传感器2 --> Flume
-    传感器3 --> Flume
-
-    Flume --> Kafka
-
-    Kafka --> Spark
-
-    Spark --> HDFS
-
-    HDFS --> Spark
-    HDFS --> MLlib
-
-    MLlib --> HDFS
-
-    HDFS --> Kibana
-    Spark --> Kibana
-
-```
+## 8. 系统接口
 
 
+### 8.1.数据采集接口
 
-### 7.1 数据采集接口
-
-#### 传感器接口
+#### **IoT设备集成接口**
 
 ##### getSensorData(sensorType, sensorId)
 
-用于从指定传感器获取实时数据。
+  用于从指定传感器获取实时数据。
 
-- 参数说明：
-  - sensorType：传感器类型（温度、湿度、压力等）
-  - sensorId：传感器ID
-- 返回值类型：传感器数据或错误信息
+  - 参数说明：
+    - sensorType：传感器类型（温度、湿度、压力等）
+    - sensorId：传感器ID
+  - 返回值类型：传感器数据或错误信息
 
-##### 传感器数据格式
+##### configureSensor(sensorType, sensorId, configParams)
 
-- 数据类型：JSON
+  用于配置指定传感器的参数。
 
-- 示例：
+  - 参数说明：
+    - sensorType：传感器类型（温度、湿度、压力等）
+    - sensorId：传感器ID
+    - configParams：配置参数
+  - 返回值类型：True(配置成功)或 False(配置失败)
 
-  ```json
-  {
-    "sensorId": "sensor_01",
-    "sensorType": "temperature",
-    "timestamp": "2024-06-25T12:34:56Z",
-    "value": 23.5
-  }
-  ```
+#### **Apache Flume接口**
 
-#### Flume接口
+##### flumeSourceSetup(sourceType, sourceConfig)
 
-##### sendDataToFlume(data)
+  设置Flume的Source，指定数据源类型及其配置。
 
-将传感器数据发送到Flume进行初步处理。
+  - 参数说明：
+    - sourceType：数据源类型
+    - sourceConfig：数据源配置
+  - 返回值类型：True(设置成功)或 False(设置失败)
 
-- 参数说明：
-  - data：传感器数据，JSON格式
-- 返回值类型：True(发送成功)或 False(发送失败)
+##### flumeSinkSetup(sinkType, sinkConfig)
 
-### 7.2 数据处理接口
+  设置Flume的Sink，指定目标系统及其配置。
 
-#### Kafka接口
+  - 参数说明：
+    - sinkType：目标系统类型
+    - sinkConfig：目标系统配置
+  - 返回值类型：True(设置成功)或 False(设置失败)
 
-##### sendDataToKafka(data)
+### 8.2.数据处理接口
 
-将Flume处理后的数据发送到Kafka。
+#### **Apache Kafka接口**
 
-- 参数说明：
-  - data：处理后的传感器数据，JSON格式
-- 返回值类型：True(发送成功)或 False(发送失败)
+##### kafkaProduce(topic, message)
 
-##### Kafka配置
+  将消息发送到Kafka的指定主题。
 
-- 主题：sensor_data
-- 分区：3
-- 副本：2
+  - 参数说明：
+    - topic：Kafka主题
+    - message：要发送的消息（必须是Brick格式）
+  - 返回值类型：True(发送成功)或 False(发送失败)
 
-#### Spark接口
+##### kafkaConsume(topic, groupId)
 
-##### readDataFromKafka(topic)
+  从Kafka的指定主题中消费消息。
 
-从Kafka读取数据进行处理和分析。
+  - 参数说明：
+    - topic：Kafka主题
+    - groupId：消费者组ID
+  - 返回值类型：消费到的消息（Brick格式）或错误信息
 
-- 参数说明：
-  - topic：Kafka主题名称
-- 返回值类型：数据流对象或错误信息
+#### **Apache Spark接口**
 
-##### processData(dataStream)
+##### sparkStreamProcess(kafkaParams, processingFunc)
 
-处理从Kafka读取的数据，并存储到HDFS。
+  使用Spark Streaming处理Kafka数据流。
 
-- 参数说明：
-  - dataStream：Kafka数据流对象
-- 返回值类型：True(处理成功)或 False(处理失败)
+  - 参数说明：
+    - kafkaParams：Kafka参数
+    - processingFunc：处理函数（处理Brick格式的数据）
+  - 返回值类型：True(处理成功)或 False(处理失败)
 
-### 7.3 数据存储接口
+##### sparkSQLQuery(query)
 
-#### HDFS接口
+  执行Spark SQL查询。
 
-##### writeToHDFS(data)
+  - 参数说明：
+    - query：SQL查询语句（查询的数据为Brick格式）
+  - 返回值类型：查询结果或错误信息
 
-将处理后的数据存储到HDFS。
+#### **spark MLlib接口**
 
-- 参数说明：
-  - data：处理后的传感器数据，JSON格式
-- 返回值类型：True(写入成功)或 False(写入失败)
+##### trainModel(trainingData, modelParams)
 
-##### readFromHDFS(path)
+  使用Spark MLlib训练预测模型。
 
-从HDFS读取存储的数据。
+  - 参数说明：
+    - trainingData：训练数据（Brick格式）
+    - modelParams：模型参数
+  - 返回值类型：训练好的模型或错误信息
 
-- 参数说明：
-  - path：HDFS路径
-- 返回值类型：数据对象或错误信息
+##### predictData(model, inputData)
 
-### 7.4 用户界面接口
+  使用训练好的模型进行预测。
+
+  - 参数说明：
+    - model：训练好的模型
+    - inputData：输入数据（Brick格式）
+  - 返回值类型：预测结果或错误信息
+
+### 8.3.数据存储接口
+
+#### Hadoop HDFS接口
+
+##### storeData(filePath, data)
+
+  将数据存储到HDFS指定路径。
+
+  - 参数说明：
+    - filePath：存储路径
+    - data：要存储的数据（Brick格式）
+  - 返回值类型：True(存储成功)或 False(存储失败)
+
+##### readData(filePath)
+
+  从HDFS指定路径读取数据。
+
+  - 参数说明：
+    - filePath：存储路径
+  - 返回值类型：读取到的数据（Brick格式）或错误信息
+
+#### Elasticsearch接口
+
+##### indexData(indexName, data)
+
+  将数据索引到Elasticsearch的指定索引中。
+
+  - 参数说明：
+    - indexName：索引名称
+    - data：要索引的数据（Brick格式）
+  - 返回值类型：True(索引成功)或 False(索引失败)
+
+##### searchData(indexName, query)
+
+  在Elasticsearch的指定索引中进行搜索。
+
+  - 参数说明：
+    - indexName：索引名称
+    - query：查询条件
+  - 返回值类型：查询结果或错误信息
+
+### 8.4.用户界面接口
 
 #### Kibana接口
 
-##### displayRealTimeData()
+##### createDashboard(dashboardName, visualizations)
 
-在Kibana仪表盘上显示实时传感器数据。
+  创建Kibana仪表板，指定仪表板名称和可视化组件。
 
-- 参数说明：不需指定参数
-- 返回值类型：True(显示成功)或 False(显示失败)
+  - 参数说明：
+    - dashboardName：仪表板名称
+    - visualizations：可视化组件列表
+  - 返回值类型：True(创建成功)或 False(创建失败)
 
-##### displayPredictionResults()
+##### updateVisualization(visualizationId, newConfig)
 
-在Kibana仪表盘上显示故障预测结果。
+  更新Kibana的可视化组件配置。
 
-- 参数说明：不需指定参数
-- 返回值类型：True(显示成功)或 False(显示失败)
+  - 参数说明：
+    - visualizationId：可视化组件ID
+    - newConfig：新配置
+  - 返回值类型：True(更新成功)或 False(更新失败)
 
-##### updateDashboard(data)
+### 8.5. 模型评估与优化接口
 
-更新Kibana仪表盘上的数据，包括实时数据和预测结果。
+##### evaluateModel(model, testData)
 
-- 参数说明：
-  - data：需要显示的更新数据
-- 返回值类型：True(更新成功)或 False(更新失败)
+  评估模型性能，返回评估结果。
 
-### 示例接口详细描述
+  - 参数说明：
+    - model：要评估的模型
+    - testData：测试数据（Brick格式）
+  - 返回值类型：评估结果或错误信息
 
-#### 数据采集接口
+##### optimizeModel(model, optimizationParams)
 
-##### getSensorData(sensorType, sensorId)
+  根据优化参数调整和优化模型。
 
-用于从指定传感器获取实时数据。
+  - 参数说明：
+    - model：要优化的模型
+    - optimizationParams：优化参数
+  - 返回值类型：优化后的模型或错误信息
 
-- 参数说明：
-  - sensorType：传感器类型（温度、湿度、压力等）
-  - sensorId：传感器ID
-- 返回值类型：传感器数据或错误信息
+## 9. 系统管理
 
-##### sendDataToFlume(data)
-
-将传感器数据发送到Flume进行初步处理。
-
-- 参数说明：
-  - data：传感器数据，JSON格式
-- 返回值类型：True(发送成功)或 False(发送失败)
-
-#### 数据处理接口
-
-##### sendDataToKafka(data)
-
-将Flume处理后的数据发送到Kafka。
-
-- 参数说明：
-  - data：处理后的传感器数据，JSON格式
-- 返回值类型：True(发送成功)或 False(发送失败)
-
-##### readDataFromKafka(topic)
-
-从Kafka读取数据进行处理和分析。
-
-- 参数说明：
-  - topic：Kafka主题名称
-- 返回值类型：数据流对象或错误信息
-
-##### processData(dataStream)
-
-处理从Kafka读取的数据，并存储到HDFS。
-
-- 参数说明：
-  - dataStream：Kafka数据流对象
-- 返回值类型：True(处理成功)或 False(处理失败)
-
-#### 数据存储接口
-
-##### writeToHDFS(data)
-
-将处理后的数据存储到HDFS。
-
-- 参数说明：
-  - data：处理后的传感器数据，JSON格式
-- 返回值类型：True(写入成功)或 False(写入失败)
-
-##### readFromHDFS(path)
-
-从HDFS读取存储的数据。
-
-- 参数说明：
-  - path：HDFS路径
-- 返回值类型：数据对象或错误信息
-
-#### 用户界面接口
-
-##### displayRealTimeData()
-
-在Kibana仪表盘上显示实时传感器数据。
-
-- 参数说明：不需指定参数
-- 返回值类型：True(显示成功)或 False(显示失败)
-
-##### displayPredictionResults()
-
-在Kibana仪表盘上显示故障预测结果。
-
-- 参数说明：不需指定参数
-- 返回值类型：True(显示成功)或 False(显示失败)
-
-##### updateDashboard(data)
-
-更新Kibana仪表盘上的数据，包括实时数据和预测结果。
-
-- 参数说明：
-  - data：需要显示的更新数据
-- 返回值类型：True(更新成功)或 False(更新失败)
-
-## 8. 系统管理
-
-### 8.1 系统配置
+### 9.1 系统配置
 
 - **配置文件管理**：管理各组件的配置文件，包括Flume、Kafka、Spark、HDFS和Kibana。
 - **系统监控**：实时监控系统运行状态，确保系统的高可用性。
 
-### 8.2 数据管理
+### 9.2 数据管理
 
 - **数据清理**：定期清理过期和无效数据，确保存储空间的高效利用。
 - **数据备份与恢复**：提供数据备份和恢复机制，确保数据的安全性和可靠性。
 
-### 8.3 模型管理
+### 9.3 模型管理
 
 - **模型训练**：定期训练和更新故障预测模型，确保预测的准确性。
 - **模型评估**：定期评估模型性能，确保模型的有效性。
 
-## 9. 总结
+## 10. 总结
 
 本系统通过多层架构设计，实现了HVAC系统的实时监测和故障预测。采用Apache Flume、Apache Kafka、Apache Spark、Hadoop HDFS和Kibana等技术，实现了高效的数据采集、传输、存储、分析和展示。综合比较不同的故障预测算法，选用长短期记忆网络（LSTM）作为预测模型，能够有效提高故障预测的准确性和及时性。系统设计充分考虑了可扩展性、可维护性和用户体验，提供了完整的接口和管理机制，确保系统的高效运行。
 
-```mermaid
-graph TD
-    subgraph 传感器层
-        TempSensor(温度传感器)
-        HumidSensor(湿度传感器)
-        PressSensor(压力传感器)
-    end
 
-    subgraph 数据采集层
-        Flume[Apache Flume]
-        Kafka[Apache Kafka]
-    end
-
-    subgraph 数据处理与存储层
-        Spark[Apache Spark]
-        HDFS[Hadoop HDFS]
-    end
-
-    subgraph 数据分析层
-        MLlib[Spark MLlib]
-        Model[LSTM 预测模型]
-    end
-
-    subgraph 用户界面层
-        Kibana[Kibana]
-        Dashboard[故障预测仪表盘]
-    end
-
-    TempSensor --> Flume
-    HumidSensor --> Flume
-    PressSensor --> Flume
-
-    Flume --> Kafka
-
-    Kafka --> Spark
-
-    Spark --> HDFS
-
-    HDFS --> Spark
-    HDFS --> MLlib
-
-    MLlib --> Model
-
-    Model --> HDFS
-    Model --> Kibana
-
-    HDFS --> Kibana
-    Spark --> Kibana
-    Kibana --> Dashboard
-
-```
 
