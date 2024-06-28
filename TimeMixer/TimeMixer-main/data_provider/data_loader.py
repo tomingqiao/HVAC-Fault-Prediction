@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 import glob
+import rdflib
 import re
 import torch
 from torch.utils.data import Dataset
@@ -192,103 +193,134 @@ class Dataset_ETT_minute(Dataset):
         return self.scaler.inverse_transform(data)
 
 
-class Dataset_Custom(Dataset):
-    def __init__(self, root_path, flag='train', size=None,
-                 features='S', data_path='ETTh1.csv',
-                 target='OT', scale=True, timeenc=0, freq='h', seasonal_patterns=None):
-        # size [seq_len, label_len, pred_len]
-        # info
-        if size == None:
-            self.seq_len = 24 * 4 * 4
-            self.label_len = 24 * 4
-            self.pred_len = 24 * 4
-        else:
-            self.seq_len = size[0]
-            self.label_len = size[1]
-            self.pred_len = size[2]
-        # init
-        assert flag in ['train', 'test', 'val']
-        type_map = {'train': 0, 'val': 1, 'test': 2}
-        self.set_type = type_map[flag]
+class Dataset_Custom(Dataset):  # 继承自 PyTorch 的 Dataset 类，用于加载自定义数据集（Brick 格式）
+    def __init__(self, root_path, flag='train', size=None,  # 初始化方法，接收数据集路径、数据分割标志、数据大小等参数
+                 features='S', data_path='brick_data.ttl',  # 特征类型、数据文件路径
+                 target='target', scale=True, timeenc=0, freq='h', seasonal_patterns=None):  # 是否标准化、时间编码类型、频率、季节性模式
+        # size [seq_len, label_len, pred_len]  # 数据大小，包括序列长度、标签长度、预测长度
+        # info  # 信息
+        if size == None:  # 如果没有指定数据大小，则使用默认值
+            self.seq_len = 24 * 4 * 4  # 序列长度：4 天，每小时一个数据点
+            self.label_len = 24 * 4  # 标签长度：1 天，每小时一个数据点
+            self.pred_len = 24 * 4  # 预测长度：1 天，每小时一个数据点
+        else:  # 如果指定了数据大小，则使用指定的值
+            self.seq_len = size[0]  # 序列长度
+            self.label_len = size[1]  # 标签长度
+            self.pred_len = size[2]  # 预测长度
 
-        self.features = features
-        self.target = target
-        self.scale = scale
-        self.timeenc = timeenc
-        self.freq = freq
+        # init  # 初始化
+        assert flag in ['train', 'test', 'val']  # 确保数据分割标志是 'train'、'test' 或 'val' 之一
+        type_map = {'train': 0, 'val': 1, 'test': 2}  # 将数据分割标志映射到数字
+        self.set_type = type_map[flag]  # 获取当前数据分割类型
 
-        self.root_path = root_path
-        self.data_path = data_path
-        self.__read_data__()
+        self.features = features  # 特征类型
+        self.target = target  # 目标特征名称
+        self.scale = scale  # 是否标准化
+        self.timeenc = timeenc  # 时间编码类型
+        self.freq = freq  # 频率
 
-    def __read_data__(self):
-        self.scaler = StandardScaler()
-        df_raw = pd.read_csv(os.path.join(self.root_path,
-                                          self.data_path))
+        self.root_path = root_path  # 数据集路径
+        self.data_path = data_path  # 数据文件路径
+        self.__read_data__()  # 读取数据
 
-        '''
-        df_raw.columns: ['date', ...(other features), target feature]
-        '''
-        cols = list(df_raw.columns)
-        cols.remove(self.target)
-        cols.remove('date')
-        df_raw = df_raw[['date'] + cols + [self.target]]
-        num_train = int(len(df_raw) * 0.7)
-        num_test = int(len(df_raw) * 0.2)
-        num_vali = len(df_raw) - num_train - num_test
-        border1s = [0, num_train - self.seq_len, len(df_raw) - num_test - self.seq_len]
-        border2s = [num_train, num_train + num_vali, len(df_raw)]
-        border1 = border1s[self.set_type]
-        border2 = border2s[self.set_type]
+    def __read_data__(self):  # 读取数据的方法
+        self.scaler = StandardScaler()  # 创建标准化器
 
-        if self.features == 'M' or self.features == 'MS':
-            cols_data = df_raw.columns[1:]
-            df_data = df_raw[cols_data]
-        elif self.features == 'S':
-            df_data = df_raw[[self.target]]
+        # 创建一个 RDF 图
+        graph = rdflib.Graph()
 
+        # 解析 TTL 文件
+        graph.parse(os.path.join(self.root_path, self.data_path), format="ttl")
+
+        # 使用 SPARQL 查询语句提取时间序列数据
+        # 示例：查询所有 brick:Point 实例及其关联的时间戳和值
+        query = """
+        SELECT ?measurement ?timestamp ?value
+        WHERE {
+        ?measurement a brick1:Measurement .
+        ?measurement rdfs:label ?timestamp .
+        ?measurement brick1:DaTemp ?value .
+        }
+        """
+        results = graph.query(query)
+        data_list = []
+        for row in results:
+            try:
+                value = float(row.value)
+                data_list.append((str(row.measurement), str(row.timestamp), value))
+            except (ValueError, TypeError):
+                continue
+
+        data = pd.DataFrame(data_list, columns=['measurement', 'timestamp', 'value'])
+
+        """# 将数据转换为 Pandas DataFrame
+        data = pd.DataFrame(
+            [(str(row.measurement), str(row.timestamp), float(row.value)) for row in results],
+            columns=['measurement', 'timestamp', 'value']
+        )"""
+
+        print("Data shape:", data.shape)  # 添加这行test
+        print(data.head())  # 添加这行以查看数据的前几行test
+
+        data['timestamp'] = pd.to_datetime(data['timestamp'], format="%Y-%m-%d_%H:%M:%S", errors='coerce')
+
+        data = data.dropna(subset=['timestamp'])
+        # 数据分割
+        # 这里假设数据按时间顺序排列，并按照 70%、20%、10% 的比例划分训练集、验证集和测试集
+        data = data.sort_values(by='timestamp')
+        num_samples = len(data)
+        num_train = int(num_samples * 0.7)
+        num_val = int(num_samples * 0.2)
+        num_test = num_samples - num_train - num_val
+
+        if self.set_type == 0:  # 训练集
+            data = data[:num_train]
+        elif self.set_type == 1:  # 验证集
+            data = data[num_train:num_train + num_val]
+        else:  # 测试集
+            data = data[num_train + num_val:]
+        print("Filtered data shape:", data.shape)
+        if len(data) == 0:
+            raise ValueError("数据集为空，请检查数据路径和查询条件。")
+
+        # 标准化
         if self.scale:
-            train_data = df_data[border1s[0]:border2s[0]]
-            self.scaler.fit(train_data.values)
-            data = self.scaler.transform(df_data.values)
-        else:
-            data = df_data.values
+            self.scaler.fit(data['value'].values.reshape(-1, 1))
+            data['value'] = self.scaler.transform(data['value'].values.reshape(-1, 1))
 
-        df_stamp = df_raw[['date']][border1:border2]
-        df_stamp['date'] = pd.to_datetime(df_stamp.date)
-        if self.timeenc == 0:
+        # 时间编码
+        self.data_stamp = pd.to_datetime(data['timestamp'])
+        self.data_x = data.pivot(index='timestamp', columns='measurement', values='value').values
+        self.data_y = self.data_x  # 假设标签与特征相同
+
+        if self.timeenc == 0:  # 使用月份、日期、星期几、小时作为时间特征
+            df_stamp = pd.DataFrame({'date': self.data_stamp})
             df_stamp['month'] = df_stamp.date.apply(lambda row: row.month, 1)
             df_stamp['day'] = df_stamp.date.apply(lambda row: row.day, 1)
             df_stamp['weekday'] = df_stamp.date.apply(lambda row: row.weekday(), 1)
             df_stamp['hour'] = df_stamp.date.apply(lambda row: row.hour, 1)
-            data_stamp = df_stamp.drop(['date'], 1).values
-        elif self.timeenc == 1:
-            data_stamp = time_features(pd.to_datetime(df_stamp['date'].values), freq=self.freq)
-            data_stamp = data_stamp.transpose(1, 0)
+            self.data_stamp = df_stamp.drop(['date'], axis=1).values
+        elif self.timeenc == 1:  # 使用 time_features 函数生成时间特征
+            self.data_stamp = time_features(self.data_stamp, freq=self.freq).transpose(1, 0)
 
-        self.data_x = data[border1:border2]
-        self.data_y = data[border1:border2]
-        self.data_stamp = data_stamp
+    def __getitem__(self, index):  # 获取单个样本的方法
+        s_begin = index  # 获取序列起始位置
+        s_end = s_begin + self.seq_len  # 获取序列结束位置
+        r_begin = s_end - self.label_len  # 获取标签起始位置
+        r_end = r_begin + self.label_len + self.pred_len  # 获取标签结束位置
 
-    def __getitem__(self, index):
-        s_begin = index
-        s_end = s_begin + self.seq_len
-        r_begin = s_end - self.label_len
-        r_end = r_begin + self.label_len + self.pred_len
+        seq_x = self.data_x[s_begin:s_end]  # 获取输入序列
+        seq_y = self.data_y[r_begin:r_end]  # 获取输出序列
+        seq_x_mark = self.data_stamp[s_begin:s_end]  # 获取输入序列的时间戳
+        seq_y_mark = self.data_stamp[r_begin:r_end]  # 获取输出序列的时间戳
 
-        seq_x = self.data_x[s_begin:s_end]
-        seq_y = self.data_y[r_begin:r_end]
-        seq_x_mark = self.data_stamp[s_begin:s_end]
-        seq_y_mark = self.data_stamp[r_begin:r_end]
+        return seq_x, seq_y, seq_x_mark, seq_y_mark  # 返回输入序列、输出序列、输入时间戳、输出时间戳
 
-        return seq_x, seq_y, seq_x_mark, seq_y_mark
+    def __len__(self):  # 获取数据集长度的方法
+        return len(self.data_x) - self.seq_len - self.pred_len + 1  # 返回数据集长度
 
-    def __len__(self):
-        return len(self.data_x) - self.seq_len - self.pred_len + 1
-
-    def inverse_transform(self, data):
-        return self.scaler.inverse_transform(data)
-
+    def inverse_transform(self, data):  # 反标准化的方法
+        return self.scaler.inverse_transform(data)  # 对数据进行反标准化
 
 class Dataset_M4(Dataset):
     def __init__(self, root_path, flag='pred', size=None,
