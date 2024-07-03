@@ -340,7 +340,10 @@ parameters = [
     '--down_sampling_window', '2'
 ]
 ```
+
+
 ## 数据集解读
+
 - ChWVlvPos: 冷却水阀门开度 (Chilled Water Valve Position)
 - DaFanPower: 送风机功率 (Discharge Air Fan Power)
 - CCALTemp: 冷却盘管出风温度 (Cooling Coil Air Leaving Temperature)
@@ -361,3 +364,161 @@ parameters = [
 - ZoneDaTemp_2: 区域 2 送风温度 (Zone 2 Discharge Air Temperature)
 - ZoneTemp_1: 区域 1 温度 (Zone 1 Temperature)
 - ZoneTemp_2: 区域 2 温度 (Zone 2 Temperature)
+
+
+
+### 关系
+
+HVAC系统中的各个指标之间存在复杂的相互关系，这些关系可以帮助我们理解系统的运行状态并诊断潜在的故障。以下是一些可能的指标关系及其对故障诊断的指示：
+
+1. **冷却系统关系**：
+   - **ChWVlvPos** 与 **CCALTemp**：如果冷却水阀门开度（ChWVlvPos）很低，但冷却盘管出风温度（CCALTemp）仍然很高，可能表明冷却水流量不足或阀门故障。
+
+2. **送风系统关系**：
+   - **DaFanPower** 与 **DaTemp** 和 **ZoneDaTemp_1/2**：如果送风机功率（DaFanPower）很高，但送风温度（DaTemp）和区域送风温度（ZoneDaTemp_1/2）没有显著下降，可能表明送风系统存在阻塞或风机效率问题。
+
+3. **新风与回风系统关系**：
+   - **OaDmprPos** 与 **OaTemp** 和 **MaTemp**：如果新风风阀开度（OaDmprPos）很高，但新风温度（OaTemp）和混合空气温度（MaTemp）没有显著变化，可能表明新风管道存在泄漏或传感器故障。
+
+4. **加热系统关系**：
+   - **HWVlvPos** 与 **HCALTemp**：如果热水阀门开度（HWVlvPos）很高，但加热盘管出风温度（HCALTemp）很低，可能表明热水供应不足或加热盘管效率低下。
+
+5. **再热系统关系**：
+   - **ReHeatVlvPos_1/2** 与 **ZoneDaTemp_1/2**：如果再热阀门开度（ReHeatVlvPos_1/2）很高，但区域送风温度（ZoneDaTemp_1/2）没有显著上升，可能表明再热系统存在问题，如再热器堵塞或阀门故障。
+
+6. **温度控制关系**：
+   - **DaTemp**、**RaTemp** 和 **ZoneTemp_1/2**：如果送风温度（DaTemp）和回风温度（RaTemp）与区域温度（ZoneTemp_1/2）之间存在显著差异，可能表明温度控制系统调节不当或存在传感器误差。
+
+7. **风阀开度与风量关系**：
+   - **EaDmprPos**、**OaDmprPos**、**RaDmprPos** 与 **DaFanPower**、**RaFanPower**：风阀开度与风机功率之间的关系可以帮助诊断风道阻塞、阀门故障或风机效率问题。
+
+8. **室内外温差关系**：
+   - **OaTemp** 与 **ZoneTemp_1/2**：如果室内外温差过大或过小，可能表明新风引入不足或过度，需要调整新风风阀开度（OaDmprPos）。
+
+9. **系统平衡关系**：
+   - **MaTemp**、**DaTemp**、**RaTemp** 和 **OaTemp** 之间的关系可以帮助判断系统是否平衡，是否存在过度冷却或加热。
+
+通过综合分析这些指标之间的关系，可以对HVAC系统的故障进行诊断。例如，如果发现冷却盘管出风温度（CCALTemp）异常高，同时冷却水阀门开度（ChWVlvPos）很低，这可能表明冷却水供应系统存在问题。如果送风温度（DaTemp）和区域温度（ZoneTemp_1/2）之间没有预期的温差，可能表明送风系统或温度控制系统存在问题。
+
+然而，需要注意的是，这些关系并不是绝对的，实际的故障诊断还需要结合现场情况、系统历史数据和制造商的指导进行综合判断。
+
+
+
+### 判断示例代码
+
+```python
+# 定义指标的正常范围
+normal_ranges = {
+    'ChWVlvPos': (20, 80),       # 冷却水阀门开度
+    'DaFanPower': (50, 150),     # 送风机功率
+    'CCALTemp': (6, 12),         # 冷却盘管出风温度
+    'DaTemp': (12, 16),          # 送风温度
+    'HWVlvPos': (20, 80),        # 热水阀门开度
+    'HCALTemp': (40, 60),        # 加热盘管出风温度
+    'EaDmprPos': (20, 80),       # 排风风阀开度
+    'OaDmprPos': (20, 80),       # 新风风阀开度
+    'RaDmprPos': (20, 80),       # 回风风阀开度
+    'ReHeatVlvPos_1': (0, 100),  # 再热阀门1开度
+    'ReHeatVlvPos_2': (0, 100),  # 再热阀门2开度
+    'ZoneDaTemp_1': (18, 22),    # 区域1送风温度
+    'ZoneDaTemp_2': (18, 22),    # 区域2送风温度
+    'ZoneTemp_1': (20, 24),      # 区域1温度
+    'ZoneTemp_2': (20, 24),      # 区域2温度
+}
+
+# 定义故障诊断逻辑
+def diagnose_faults(current_data, normal_ranges):
+    faults = []
+
+    # 检查冷却水阀门开度与冷却盘管出风温度的关系
+    if current_data['ChWVlvPos'] < normal_ranges['ChWVlvPos'][0] and current_data['CCALTemp'] > normal_ranges['CCALTemp'][1]:
+        faults.append("Potential cooling water flow issue or valve fault.")
+
+    # 检查送风机功率与送风温度的关系
+    if current_data['DaFanPower'] > normal_ranges['DaFanPower'][1] and current_data['DaTemp'] < normal_ranges['DaTemp'][0]:
+        faults.append("High discharge air fan power with low discharge air temperature, possible blockage or fan inefficiency.")
+
+    # 检查热水阀门开度与加热盘管出风温度的关系
+    if current_data['HWVlvPos'] < normal_ranges['HWVlvPos'][0] and current_data['HCALTemp'] < normal_ranges['HCALTemp'][0]:
+        faults.append("Low hot water valve position with low heating coil temperature, possible hot water supply issue.")
+
+    # 检查新风风阀开度、排风风阀开度与回风风阀开度的关系
+    if (current_data['OaDmprPos'] < normal_ranges['OaDmprPos'][0] or 
+        current_data['EaDmprPos'] < normal_ranges['EaDmprPos'][0] or 
+        current_data['RaDmprPos'] < normal_ranges['RaDmprPos'][0]):
+        faults.append("Low damper positions, possible ventilation issue.")
+
+    # 检查再热阀门开度与区域送风温度的关系
+    for i in [1, 2]:
+        reheat_valve = f'ReHeatVlvPos_{i}'
+        zone_da_temp = f'ZoneDaTemp_{i}'
+        if current_data[reheat_valve] > normal_ranges[reheat_valve][1] and current_data[zone_da_temp] < normal_ranges[zone_da_temp][0]:
+            faults.append(f"High reheat valve {i} position with low zone {i} discharge air temperature, possible reheat inefficiency.")
+
+    # 检查区域送风温度与区域温度的关系
+    for i in [1, 2]:
+        zone_da_temp = f'ZoneDaTemp_{i}'
+        zone_temp = f'ZoneTemp_{i}'
+        if current_data[zone_da_temp] > normal_ranges[zone_da_temp][1] and current_data[zone_temp] < normal_ranges[zone_temp][0]:
+            faults.append(f"High zone {i} discharge air temperature with low zone temperature, possible thermal imbalance.")
+
+    return faults
+
+# 假设这是某一时刻获取到的系统数据
+current_data = {
+    # ... 当前数据的指标值
+}
+
+# 使用诊断逻辑检查故障
+system_faults = diagnose_faults(current_data, normal_ranges)
+
+# 打印故障信息
+if system_faults:
+    print("System faults detected:")
+    for fault in system_faults:
+        print(f"- {fault}")
+else:
+    print("No system faults detected.")
+```
+
+
+
+## SVDD示例故障检测
+
+在提供的代码中（faults.py），定义了多个类，每个类对应于一种特定的故障检测条件（Fault Condition）。以下是每个类的大致作用和它们用于检测的故障类型：
+
+1. **HelperUtils**: 这个类提供了一些辅助函数，用于数据验证和转换，例如检查数据是否为浮点数，以及是否在0.0到1.0之间。这不是故障检测类，而是为其他类提供帮助的实用工具类。
+
+2. **FaultCondition**: 这是一个父类，为所有的故障条件类提供基础结构和方法。它不直接用于检测故障，而是作为其他故障条件类的模板。
+
+3. **FaultConditionOne**: 用于检测与送风机相关的故障，具体来说是检查送风机在尝试控制到一个静压设定点时的性能。
+
+4. **FaultConditionTwo**: 用于检测空气处理单元（AHU）的混合空气温度是否异常低，与回风和室外空气数据相比。
+
+5. **FaultConditionThree**: 与FaultConditionTwo相反，用于检测AHU的混合空气温度是否异常高。
+
+6. **FaultConditionFour**: 用于检测AHU控制编程是否存在在加热、经济器冷却、经济器加机械冷却和机械冷却操作状态之间狩猎（频繁切换）的问题。
+
+7. **FaultConditionFive**: 专门用于检测加热模式下的AHU，尝试验证供应空气温度是否在基于混合空气温度和AHU供应风扇在空气中产生的热量的可接受范围内。
+
+8. **FaultConditionSix**: 尝试验证AHU设计最小室外空气是否接近通过室外、混合和回风温度传感器计算出的室外空气分数。
+
+9. **FaultConditionSeven**: 类似于FaultConditionThirteen，但使用加热阀，用于检测AHU加热模式下的故障。
+
+10. **FaultConditionEight**: 用于检测AHU在经济器自由冷却模式下，混合空气温度与供应空气温度是否不大约相等。
+
+11. **FaultConditionNine**: 用于检测AHU在经济器自由冷却模式下，室外空气温度是否过热，以至于在没有额外机械冷却的情况下无法进行冷却。
+
+12. **FaultConditionTen**: 用于检测AHU在经济器加机械冷却模式下，当AHU处于100%室外空气模式时，室外空气温度和混合空气温度是否不大约相等。
+
+13. **FaultConditionEleven**: 用于检测AHU在经济器加机械冷却模式下，室外空气温度是否过低，不适合100%室外空气AHU运行模式。
+
+14. **FaultConditionTwelve**: 用于检测AHU在经济器加机械冷却模式和机械冷却模式下，混合空气温度是否比供应空气温度高。
+
+15. **FaultConditionThirteen**: 用于检测AHU冷却模式下，冷却阀是否卡住或泄漏，通过验证供应空气温度与供应空气温度设定点。
+
+16. **FaultConditionFourteen**: 这个类在提供的代码中没有具体的实现，可能是用于定义另一种故障条件。
+
+17. **FaultConditionFifteen**: 与FaultConditionFourteen类似，这个类在提供的代码中也没有具体的实现，可能是用于定义另一种故障条件。
+
+每个类通过`apply`方法实现具体的故障检测逻辑，该方法接受一个包含相关数据的pandas DataFrame，并返回一个新的DataFrame，其中包含故障标志。如果检测到故障，相应的标志将被设置。
