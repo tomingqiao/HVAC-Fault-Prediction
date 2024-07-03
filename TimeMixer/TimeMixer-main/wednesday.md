@@ -361,3 +361,45 @@ parameters = [
 - ZoneDaTemp_2: 区域 2 送风温度 (Zone 2 Discharge Air Temperature)
 - ZoneTemp_1: 区域 1 温度 (Zone 1 Temperature)
 - ZoneTemp_2: 区域 2 温度 (Zone 2 Temperature)
+
+## ***故障预测***关键参数设置AI建议
+
+根据您提供的 TimeMixer 参数列表和 HVAC 故障预测的目标，以下列出了一些关键参数的设置建议：
+1. 任务和模型定义:
+`--task_name`: long_term_forecast
+由于您要预测另一台空调的故障时间，这属于长期预测范畴，而非短期预测或者其他任务。
+`--model`: TimesNet
+根据您的描述，您打算使用 TimesNet 模型。
+`--features`: M (Multivariate predict multivariate)
+您的数据集包含多个传感器数据，属于多变量时间序列。
+`--c_out`: 1（有待商榷，到底是输出所有传感器数据的预测值还是输出故障发生时间的预测值？）
+预测目标是故障时间，属于单变量输出。
+2. 数据加载:
+`--data`: 自定义数据名称，例如 'HVAC'
+`--root_path`: HVAC 数据集存放的根目录
+`--data_path`: HVAC 数据集文件路径，例如 './data/HVAC/data.csv'
+`--freq`: 选择合适的时间频率，例如 'h' (hourly)
+`--seq_len`:
+根据您想使用多长的历史数据进行预测，例如，使用过去 24 小时的传感器数据预测未来 1 小时是否发生故障，则设置为 24。
+`--label_len`:
+通常设置为预测窗口长度的一半或更小，例如 pred_len 为 1，则可设置为 1。
+`--pred_len`: 1
+您需要预测未来 1 小时是否发生故障。
+3. 模型定义:
+`--enc_in`: 20
+您的数据集包含 20 个传感器数据字段。
+`--dec_in`: 根据是否使用未来时间特征决定，如不需要可与 enc_in 相同。
+`--d_model`: 可以尝试 16、32、64 等值，根据模型表现进行调整.
+`--n_heads`: 可以尝试 4、8 等值，通常与 d_model 成比例
+`--e_layers`: 编码器层数，可以尝试 2、3 层
+`--d_layers`: 解码器层数，可以尝试 1、2 层
+`--dropout`: 可以尝试 0.1、0.2 等值，防止过拟合。
+4. 优化:
+`--batch_size`: 可以尝试 16、32、64 等值，根据您的计算资源和数据集大小进行调整。
+`--train_epochs`: 可以先尝试 10、20 等 epochs，根据模型收敛情况进行调整。
+`--learning_rate`: 可以尝试 0.001、0.0001 等值，通常需要根据 batch_size 进行调整。
+5. 其他:
+`--down_sampling_layers`, `--down_sampling_window`, `--down_sampling_method` :
+这些参数与模型的下采样操作相关，需要根据您的数据特性和预测需求进行调整。如果数据没有明显的周期性，可以不进行下采样操作。
+`--use_future_temporal_feature`:
+如果您的预测任务中包含可获取的未来时间特征，例如节假日安排、天气预报等，可以设置为 1 并提供相应的特征数据。
