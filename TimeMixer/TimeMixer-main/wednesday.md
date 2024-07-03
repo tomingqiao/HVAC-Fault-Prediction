@@ -340,3 +340,24 @@ parameters = [
     '--down_sampling_window', '2'
 ]
 ```
+## 数据集解读
+- ChWVlvPos: 冷却水阀门开度 (Chilled Water Valve Position)
+- DaFanPower: 送风机功率 (Discharge Air Fan Power)
+- CCALTemp: 冷却盘管出风温度 (Cooling Coil Air Leaving Temperature)
+- DaTemp: 送风温度 (Discharge Air Temperature)
+- EaDmprPos: 排风风阀开度 (Exhaust Air Damper Position)
+- HCALTemp: 加热盘管出风温度 (Heating Coil Air Leaving Temperature)
+- HWVlvPos: 热水阀门开度 (Hot Water Valve Position)
+- MaTemp: 混合空气温度 (Mixed Air Temperature)
+- OaDmprPos: 新风风阀开度 (Outside Air Damper Position)
+- OaTemp: 新风温度 (Outside Air Temperature)
+- OaTemp_WS: 气象站新风温度 (Outside Air Temperature from Weather Station)
+- RaDmprPos: 回风风阀开度 (Return Air Damper Position)
+- RaFanPower: 回风机功率 (Return Air Fan Power)
+- RaTemp: 回风温度 (Return Air Temperature)
+- ReHeatVlvPos_1: 再热阀门 1 开度 (Reheat Valve Position 1)
+- ReHeatVlvPos_2: 再热阀门 2 开度 (Reheat Valve Position 2)
+- ZoneDaTemp_1: 区域 1 送风温度 (Zone 1 Discharge Air Temperature)
+- ZoneDaTemp_2: 区域 2 送风温度 (Zone 2 Discharge Air Temperature)
+- ZoneTemp_1: 区域 1 温度 (Zone 1 Temperature)
+- ZoneTemp_2: 区域 2 温度 (Zone 2 Temperature)
