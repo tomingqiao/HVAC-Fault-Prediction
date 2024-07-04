@@ -1,5 +1,0 @@
-HVAC FDD
-
-HVAC Fault Prediction
-
-https://github.com/search?q=HVAC+FDD&type=repositories
