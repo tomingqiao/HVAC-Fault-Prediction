@@ -303,136 +303,136 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         return self.model
 
     # 测试函数，用于评估模型在测试集上的表现
-def test(self, setting, test=0):
-    # 获取测试数据和对应的加载器
-    test_data, test_loader = self._get_data(flag='test')
-    
-    # 如果需要测试，则加载之前保存的模型权重
-    if test:
-        print('loading model')  # 输出加载模型的提示信息
-        self.model.load_state_dict(torch.load(os.path.join('./checkpoints/' + setting, 'checkpoint.pth')))
+    def test(self, setting, test=0):
+        # 获取测试数据和对应的加载器
+        test_data, test_loader = self._get_data(flag='test')
+        
+        # 如果需要测试，则加载之前保存的模型权重
+        if test:
+            print('loading model')  # 输出加载模型的提示信息
+            self.model.load_state_dict(torch.load(os.path.join('./checkpoints/' + setting, 'checkpoint.pth')))
 
-    # 定义检查点路径
-    checkpoints_path = './checkpoints/' + setting + '/'
-    # 初始化预测值和真实值的列表
-    preds = []
-    trues = []
-    # 定义测试结果保存路径
-    folder_path = './test_results/' + setting + '/'
-    # 如果路径不存在，则创建路径
-    if not os.path.exists(folder_path):
-        os.makedirs(folder_path)
+        # 定义检查点路径
+        checkpoints_path = './checkpoints/' + setting + '/'
+        # 初始化预测值和真实值的列表
+        preds = []
+        trues = []
+        # 定义测试结果保存路径
+        folder_path = './test_results/' + setting + '/'
+        # 如果路径不存在，则创建路径
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
 
-    # 将模型设置为评估模式
-    self.model.eval()
-    # 禁用梯度计算，以节省内存和加速计算
-    with torch.no_grad():
-        # 遍历测试数据集的每个批次
-        for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(test_loader):
-            # 将输入数据和标签转换为浮点类型，并移动到设备（如GPU）上
-            batch_x = batch_x.float().to(self.device)
-            batch_y = batch_y.float().to(self.device)
+        # 将模型设置为评估模式
+        self.model.eval()
+        # 禁用梯度计算，以节省内存和加速计算
+        with torch.no_grad():
+            # 遍历测试数据集的每个批次
+            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(test_loader):
+                # 将输入数据和标签转换为浮点类型，并移动到设备（如GPU）上
+                batch_x = batch_x.float().to(self.device)
+                batch_y = batch_y.float().to(self.device)
 
-            # 将时间标记数据转换为浮点类型并移动到设备上
-            batch_x_mark = batch_x_mark.float().to(self.device)
-            batch_y_mark = batch_y_mark.float().to(self.device)
+                # 将时间标记数据转换为浮点类型并移动到设备上
+                batch_x_mark = batch_x_mark.float().to(self.device)
+                batch_y_mark = batch_y_mark.float().to(self.device)
 
-            # 如果数据集是'PEMS'或'Solar'，则不使用时间标记数据
-            if 'PEMS' == self.args.data or 'Solar' == self.args.data:
-                batch_x_mark = None
-                batch_y_mark = None
+                # 如果数据集是'PEMS'或'Solar'，则不使用时间标记数据
+                if 'PEMS' == self.args.data or 'Solar' == self.args.data:
+                    batch_x_mark = None
+                    batch_y_mark = None
 
-            # 如果不使用下采样层，则生成decoder的输入
-            if self.args.down_sampling_layers == 0:
-                # 生成一个与batch_y最后n个时间步长相同形状的零张量，并与batch_y的前label_len个时间步长拼接
-                dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
-                dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float().to(self.device)
-            else:
-                dec_inp = None
+                # 如果不使用下采样层，则生成decoder的输入
+                if self.args.down_sampling_layers == 0:
+                    # 生成一个与batch_y最后n个时间步长相同形状的零张量，并与batch_y的前label_len个时间步长拼接
+                    dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
+                    dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float().to(self.device)
+                else:
+                    dec_inp = None
 
-            # 编码器 - 解码器部分
-            if self.args.use_amp:
-                # 如果使用自动混合精度进行前向传播
-                with torch.cuda.amp.autocast():
-                    # 如果输出注意力图，则只取模型输出的第一个元素
+                # 编码器 - 解码器部分
+                if self.args.use_amp:
+                    # 如果使用自动混合精度进行前向传播
+                    with torch.cuda.amp.autocast():
+                        # 如果输出注意力图，则只取模型输出的第一个元素
+                        if self.args.output_attention:
+                            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
+                        else:
+                            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+                else:
+                    # 正常进行前向传播
                     if self.args.output_attention:
                         outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
                     else:
                         outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
-            else:
-                # 正常进行前向传播
-                if self.args.output_attention:
-                    outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
-                else:
-                    outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
 
-            # 根据特征类型调整输出的维度
-            f_dim = -1 if self.args.features == 'MS' else 0
+                # 根据特征类型调整输出的维度
+                f_dim = -1 if self.args.features == 'MS' else 0
 
-            # 将输出和标签从GPU转移到CPU，并转换为NumPy数组
-            outputs = outputs.detach().cpu().numpy()
-            batch_y = batch_y.detach().cpu().numpy()
+                # 将输出和标签从GPU转移到CPU，并转换为NumPy数组
+                outputs = outputs.detach().cpu().numpy()
+                batch_y = batch_y.detach().cpu().numpy()
 
-            # 将当前批次的预测值和真实值保存到列表中
-            pred = outputs
-            true = batch_y
+                # 将当前批次的预测值和真实值保存到列表中
+                pred = outputs
+                true = batch_y
 
-            preds.append(pred)
-            trues.append(true)
+                preds.append(pred)
+                trues.append(true)
 
-            # 每隔20个批次，进行一次可视化保存
-            if i % 20 == 0:
-                input = batch_x.detach().cpu().numpy()
-                # 如果需要反归一化数据，则进行处理
-                if test_data.scale and self.args.inverse:
-                    shape = input.shape
-                    input = test_data.inverse_transform(input.squeeze(0)).reshape(shape)
-                # 将输入、真实值和预测值连接起来，进行对比
-                gt = np.concatenate((input[0, :, -1], true[0, :, -1]), axis=0)
-                pd = np.concatenate((input[0, :, -1], pred[0, :, -1]), axis=0)
-                # 保存可视化图像
-                visual(gt, pd, os.path.join(folder_path, str(i) + '.pdf'))
+                # 每隔20个批次，进行一次可视化保存
+                if i % 20 == 0:
+                    input = batch_x.detach().cpu().numpy()
+                    # 如果需要反归一化数据，则进行处理
+                    if test_data.scale and self.args.inverse:
+                        shape = input.shape
+                        input = test_data.inverse_transform(input.squeeze(0)).reshape(shape)
+                    # 将输入、真实值和预测值连接起来，进行对比
+                    gt = np.concatenate((input[0, :, -1], true[0, :, -1]), axis=0)
+                    pd = np.concatenate((input[0, :, -1], pred[0, :, -1]), axis=0)
+                    # 保存可视化图像
+                    visual(gt, pd, os.path.join(folder_path, str(i) + '.pdf'))
 
-    # 将预测值和真实值转换为NumPy数组
-    preds = np.array(preds)
-    trues = np.array(trues)
-    print('test shape:', preds.shape, trues.shape)  # 输出预测值和真实值的形状
-    preds = preds.reshape(-1, preds.shape[-2], preds.shape[-1])
-    trues = trues.reshape(-1, trues.shape[-2], trues.shape[-1])
-    print('test shape:', preds.shape, trues.shape)  # 输出重整后的形状
+        # 将预测值和真实值转换为NumPy数组
+        preds = np.array(preds)
+        trues = np.array(trues)
+        print('test shape:', preds.shape, trues.shape)  # 输出预测值和真实值的形状
+        preds = preds.reshape(-1, preds.shape[-2], preds.shape[-1])
+        trues = trues.reshape(-1, trues.shape[-2], trues.shape[-1])
+        print('test shape:', preds.shape, trues.shape)  # 输出重整后的形状
 
-    # 如果数据集为'PEMS'，进行反归一化处理
-    if self.args.data == 'PEMS':
-        B, T, C = preds.shape
-        preds = test_data.inverse_transform(preds.reshape(-1, C)).reshape(B, T, C)
-        trues = test_data.inverse_transform(trues.reshape(-1, C)).reshape(B, T, C)
+        # 如果数据集为'PEMS'，进行反归一化处理
+        if self.args.data == 'PEMS':
+            B, T, C = preds.shape
+            preds = test_data.inverse_transform(preds.reshape(-1, C)).reshape(B, T, C)
+            trues = test_data.inverse_transform(trues.reshape(-1, C)).reshape(B, T, C)
 
-    # 保存结果
-    folder_path = './results/' + setting + '/'
-    if not os.path.exists(folder_path):
-        os.makedirs(folder_path)
+        # 保存结果
+        folder_path = './results/' + setting + '/'
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
 
-    # 计算评估指标，如均方误差（MSE）、平均绝对误差（MAE）等
-    mae, mse, rmse, mape, mspe = metric(preds, trues)
-    print('mse:{}, mae:{}'.format(mse, mae))
-    print('rmse:{}, mape:{}, mspe:{}'.format(rmse, mape, mspe))
+        # 计算评估指标，如均方误差（MSE）、平均绝对误差（MAE）等
+        mae, mse, rmse, mape, mspe = metric(preds, trues)
+        print('mse:{}, mae:{}'.format(mse, mae))
+        print('rmse:{}, mape:{}, mspe:{}'.format(rmse, mape, mspe))
 
-    # 将结果写入文本文件
-    f = open("result_long_term_forecast.txt", 'a')
-    f.write(setting + "  \n")
-    if self.args.data == 'PEMS':
-        f.write('mae:{}, mape:{}, rmse:{}'.format(mae, mape, rmse))
-    else:
-        f.write('mse:{}, mae:{}'.format(mse, mae))
-    f.write('\n')
-    f.write('\n')
-    f.close()
+        # 将结果写入文本文件
+        f = open("result_long_term_forecast.txt", 'a')
+        f.write(setting + "  \n")
+        if self.args.data == 'PEMS':
+            f.write('mae:{}, mape:{}, rmse:{}'.format(mae, mape, rmse))
+        else:
+            f.write('mse:{}, mae:{}'.format(mse, mae))
+        f.write('\n')
+        f.write('\n')
+        f.close()
 
-    # 保存评估指标和预测值、真实值为NumPy数组
-    np.save(folder_path + 'metrics.npy', np.array([mae, mse, rmse, mape, mspe]))
-    np.save(folder_path + 'pred.npy', preds)
-    np.save(folder_path + 'true.npy', trues)
+        # 保存评估指标和预测值、真实值为NumPy数组
+        np.save(folder_path + 'metrics.npy', np.array([mae, mse, rmse, mape, mspe]))
+        np.save(folder_path + 'pred.npy', preds)
+        np.save(folder_path + 'true.npy', trues)
 
-    return  # 返回结果
+        return  # 返回结果
 
 

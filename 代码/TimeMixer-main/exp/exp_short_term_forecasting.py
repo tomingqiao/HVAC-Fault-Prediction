@@ -229,105 +229,105 @@ class Exp_Short_Term_Forecast(Exp_Basic):
         return loss  # 返回验证损失
 
 
-   def test(self, setting, test=0):  # 定义测试函数，接收两个参数：设置和测试标志
-    # 获取训练数据和测试数据的加载器
-    _, train_loader = self._get_data(flag='train')  # 获取训练数据加载器
-    _, test_loader = self._get_data(flag='test')  # 获取测试数据加载器
-    
-    # 获取最后一个训练窗口的数据（x）和测试集的时间序列（y）
-    x, _ = train_loader.dataset.last_insample_window()  # 获取最后一个训练窗口
-    y = test_loader.dataset.timeseries  # 获取测试集的时间序列
-    
-    # 将x转换为浮点型张量，并移动到指定设备（如GPU）
-    x = torch.tensor(x, dtype=torch.float32).to(self.device)
-    x = x.unsqueeze(-1)  # 在最后一个维度上扩展x的维度
-
-    # 如果test标志为1，则加载模型的权重
-    if test:
-        print('loading model')  # 打印加载模型信息
-        # 加载模型权重
-        self.model.load_state_dict(torch.load(os.path.join('./checkpoints/' + setting, 'checkpoint.pth')))
-
-    # 设置测试结果的保存路径，如果路径不存在则创建
-    folder_path = './test_results/' + setting + '/'
-    if not os.path.exists(folder_path):
-        os.makedirs(folder_path)
-
-    self.model.eval()  # 设置模型为评估模式
-    with torch.no_grad():  # 禁用梯度计算，减少内存消耗，加快推理速度
-        B, _, C = x.shape  # 获取输入张量x的形状（B：批量大小，C：通道数）
-        # 创建解码器输入张量，初始化为零，并移动到指定设备
-        dec_inp = torch.zeros((B, self.args.pred_len, C)).float().to(self.device)
-        # 将x的最后一部分与解码器输入张量拼接，形成新的解码器输入
-        dec_inp = torch.cat([x[:, -self.args.label_len:, :], dec_inp], dim=1).float()
+    def test(self, setting, test=0):  # 定义测试函数，接收两个参数：设置和测试标志
+        # 获取训练数据和测试数据的加载器
+        _, train_loader = self._get_data(flag='train')  # 获取训练数据加载器
+        _, test_loader = self._get_data(flag='test')  # 获取测试数据加载器
         
-        # 初始化输出张量，存储模型预测结果
-        outputs = torch.zeros((B, self.args.pred_len, C)).float().to(self.device)
-        id_list = np.arange(0, B, 1)  # 生成一个从0到B的等差数列，步长为1
-        id_list = np.append(id_list, B)  # 将批量大小B添加到id列表中
+        # 获取最后一个训练窗口的数据（x）和测试集的时间序列（y）
+        x, _ = train_loader.dataset.last_insample_window()  # 获取最后一个训练窗口
+        y = test_loader.dataset.timeseries  # 获取测试集的时间序列
         
-        # 遍历id列表，并对每一部分数据进行模型预测
-        for i in range(len(id_list) - 1):
-            x_enc = x[id_list[i]:id_list[i + 1]]  # 获取当前批次的输入数据
-            # 模型预测，将结果存储在outputs中
-            outputs[id_list[i]:id_list[i + 1], :, :] = self.model(x_enc, None, dec_inp[id_list[i]:id_list[i + 1]], None)
+        # 将x转换为浮点型张量，并移动到指定设备（如GPU）
+        x = torch.tensor(x, dtype=torch.float32).to(self.device)
+        x = x.unsqueeze(-1)  # 在最后一个维度上扩展x的维度
 
-            # 每隔1000次输出当前id
-            if id_list[i] % 1000 == 0:
-                print(id_list[i])
+        # 如果test标志为1，则加载模型的权重
+        if test:
+            print('loading model')  # 打印加载模型信息
+            # 加载模型权重
+            self.model.load_state_dict(torch.load(os.path.join('./checkpoints/' + setting, 'checkpoint.pth')))
 
-        # 根据特征类型调整输出张量的维度
-        f_dim = -1 if self.args.features == 'MS' else 0
-        outputs = outputs[:, -self.args.pred_len:, f_dim:]  # 截取预测长度部分的输出
-        outputs = outputs.detach().cpu().numpy()  # 将输出张量转换为NumPy数组
+        # 设置测试结果的保存路径，如果路径不存在则创建
+        folder_path = './test_results/' + setting + '/'
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
 
-        # 将预测结果和真实值赋值给变量
-        preds = outputs  # 预测结果
-        trues = y  # 真实值
-        x = x.detach().cpu().numpy()  # 将输入张量x转换为NumPy数组
+        self.model.eval()  # 设置模型为评估模式
+        with torch.no_grad():  # 禁用梯度计算，减少内存消耗，加快推理速度
+            B, _, C = x.shape  # 获取输入张量x的形状（B：批量大小，C：通道数）
+            # 创建解码器输入张量，初始化为零，并移动到指定设备
+            dec_inp = torch.zeros((B, self.args.pred_len, C)).float().to(self.device)
+            # 将x的最后一部分与解码器输入张量拼接，形成新的解码器输入
+            dec_inp = torch.cat([x[:, -self.args.label_len:, :], dec_inp], dim=1).float()
+            
+            # 初始化输出张量，存储模型预测结果
+            outputs = torch.zeros((B, self.args.pred_len, C)).float().to(self.device)
+            id_list = np.arange(0, B, 1)  # 生成一个从0到B的等差数列，步长为1
+            id_list = np.append(id_list, B)  # 将批量大小B添加到id列表中
+            
+            # 遍历id列表，并对每一部分数据进行模型预测
+            for i in range(len(id_list) - 1):
+                x_enc = x[id_list[i]:id_list[i + 1]]  # 获取当前批次的输入数据
+                # 模型预测，将结果存储在outputs中
+                outputs[id_list[i]:id_list[i + 1], :, :] = self.model(x_enc, None, dec_inp[id_list[i]:id_list[i + 1]], None)
 
-        # 遍历预测结果，生成图表和CSV文件，保存到指定路径
-        for i in range(0, preds.shape[0], preds.shape[0] // 10):
-            gt = np.concatenate((x[i, :, 0], trues[i]), axis=0)  # 生成真实值序列
-            pd = np.concatenate((x[i, :, 0], preds[i, :, 0]), axis=0)  # 生成预测值序列
-            visual(gt, pd, os.path.join(folder_path, str(i) + '.pdf'))  # 可视化预测结果
-            save_to_csv(gt, pd, os.path.join(folder_path, str(i) + '.csv'))  # 保存预测结果到CSV文件
+                # 每隔1000次输出当前id
+                if id_list[i] % 1000 == 0:
+                    print(id_list[i])
 
-    print('test shape:', preds.shape)  # 输出预测结果的形状
+            # 根据特征类型调整输出张量的维度
+            f_dim = -1 if self.args.features == 'MS' else 0
+            outputs = outputs[:, -self.args.pred_len:, f_dim:]  # 截取预测长度部分的输出
+            outputs = outputs.detach().cpu().numpy()  # 将输出张量转换为NumPy数组
 
-    # 设置M4结果的保存路径，如果路径不存在则创建
-    folder_path = './m4_results/' + self.args.model + '/'
-    if not os.path.exists(folder_path):
-        os.makedirs(folder_path)
+            # 将预测结果和真实值赋值给变量
+            preds = outputs  # 预测结果
+            trues = y  # 真实值
+            x = x.detach().cpu().numpy()  # 将输入张量x转换为NumPy数组
 
-    # 将预测结果保存为DataFrame，并保存为CSV文件
-    forecasts_df = pandas.DataFrame(preds[:, :, 0], columns=[f'V{i + 1}' for i in range(self.args.pred_len)])
-    forecasts_df.index = test_loader.dataset.ids[:preds.shape[0]]  # 设置DataFrame的索引
-    forecasts_df.index.name = 'id'  # 设置索引的名称
-    forecasts_df.set_index(forecasts_df.columns[0], inplace=True)  # 将第一列设为索引
-    forecasts_df.to_csv(folder_path + self.args.seasonal_patterns + '_forecast.csv')  # 保存DataFrame到CSV文件
+            # 遍历预测结果，生成图表和CSV文件，保存到指定路径
+            for i in range(0, preds.shape[0], preds.shape[0] // 10):
+                gt = np.concatenate((x[i, :, 0], trues[i]), axis=0)  # 生成真实值序列
+                pd = np.concatenate((x[i, :, 0], preds[i, :, 0]), axis=0)  # 生成预测值序列
+                visual(gt, pd, os.path.join(folder_path, str(i) + '.pdf'))  # 可视化预测结果
+                save_to_csv(gt, pd, os.path.join(folder_path, str(i) + '.csv'))  # 保存预测结果到CSV文件
 
-    # 输出模型名称
-    print(self.args.model)
-    file_path = './m4_results/' + self.args.model + '/'  # 设置M4结果的文件路径
+        print('test shape:', preds.shape)  # 输出预测结果的形状
 
-    # 如果所有任务完成，计算平均指标并输出结果
-    if 'Weekly_forecast.csv' in os.listdir(file_path) \
-            and 'Monthly_forecast.csv' in os.listdir(file_path) \
-            and 'Yearly_forecast.csv' in os.listdir(file_path) \
-            and 'Daily_forecast.csv' in os.listdir(file_path) \
-            and 'Hourly_forecast.csv' in os.listdir(file_path) \
-            and 'Quarterly_forecast.csv' in os.listdir(file_path):
-        m4_summary = M4Summary(file_path, self.args.root_path)  # 实例化M4总结类
-        smape_results, owa_results, mape, mase = m4_summary.evaluate()  # 评估模型性能
-        # 输出SMAPE、MAPE、MASE、OWA指标
-        print('smape:', smape_results)
-        print('mape:', mape)
-        print('mase:', mase)
-        print('owa:', owa_results)
-    else:
-        print('After all 6 tasks are finished, you can calculate the averaged index')  # 提示完成所有任务后可计算平均指标
-    
-    return  # 返回结果
+        # 设置M4结果的保存路径，如果路径不存在则创建
+        folder_path = './m4_results/' + self.args.model + '/'
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+
+        # 将预测结果保存为DataFrame，并保存为CSV文件
+        forecasts_df = pandas.DataFrame(preds[:, :, 0], columns=[f'V{i + 1}' for i in range(self.args.pred_len)])
+        forecasts_df.index = test_loader.dataset.ids[:preds.shape[0]]  # 设置DataFrame的索引
+        forecasts_df.index.name = 'id'  # 设置索引的名称
+        forecasts_df.set_index(forecasts_df.columns[0], inplace=True)  # 将第一列设为索引
+        forecasts_df.to_csv(folder_path + self.args.seasonal_patterns + '_forecast.csv')  # 保存DataFrame到CSV文件
+
+        # 输出模型名称
+        print(self.args.model)
+        file_path = './m4_results/' + self.args.model + '/'  # 设置M4结果的文件路径
+
+        # 如果所有任务完成，计算平均指标并输出结果
+        if 'Weekly_forecast.csv' in os.listdir(file_path) \
+                and 'Monthly_forecast.csv' in os.listdir(file_path) \
+                and 'Yearly_forecast.csv' in os.listdir(file_path) \
+                and 'Daily_forecast.csv' in os.listdir(file_path) \
+                and 'Hourly_forecast.csv' in os.listdir(file_path) \
+                and 'Quarterly_forecast.csv' in os.listdir(file_path):
+            m4_summary = M4Summary(file_path, self.args.root_path)  # 实例化M4总结类
+            smape_results, owa_results, mape, mase = m4_summary.evaluate()  # 评估模型性能
+            # 输出SMAPE、MAPE、MASE、OWA指标
+            print('smape:', smape_results)
+            print('mape:', mape)
+            print('mase:', mase)
+            print('owa:', owa_results)
+        else:
+            print('After all 6 tasks are finished, you can calculate the averaged index')  # 提示完成所有任务后可计算平均指标
+        
+        return  # 返回结果
 
 

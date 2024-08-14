@@ -497,7 +497,7 @@ class Model(nn.Module):
         return dec_out  # 返回异常检测结果
 
     # 定义插补函数，用于处理缺失数据的插补
-def imputation(self, x_enc, x_mark_enc, mask):
+    def imputation(self, x_enc, x_mark_enc, mask):
         # 计算每个时间序列的均值
         means = torch.sum(x_enc, dim=1) / torch.sum(mask == 1, dim=1)  # dim=1表示沿时间维度求和
         means = means.unsqueeze(1).detach()  # 增加一个维度以匹配输入数据的维度，并从计算图中分离
@@ -570,8 +570,8 @@ def imputation(self, x_enc, x_mark_enc, mask):
         return dec_out  # 返回插补后的输出
 
 
-# 前向传播函数，根据任务类型选择对应的处理方法
-def forward(self, x_enc, x_mark_enc, x_dec, x_mark_dec, mask=None):
+    # 前向传播函数，根据任务类型选择对应的处理方法
+    def forward(self, x_enc, x_mark_enc, x_dec, x_mark_dec, mask=None):
         # 长期或短期预测任务
         if self.task_name == 'long_term_forecast' or self.task_name == 'short_term_forecast':
             dec_out = self.forecast(x_enc, x_mark_enc, x_dec, x_mark_dec)  # 调用预测函数
