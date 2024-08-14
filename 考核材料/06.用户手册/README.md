@@ -16,7 +16,7 @@
 1. 确保您的系统满足以下依赖：
    - Python 3.8 或更高版本
    - Kafka、Spark、Hadoop环境配置
-3. 按照TimeMixer的README指南安装和配置环境。
+2. 按照TimeMixer的README指南安装和配置环境。
 
 ## 快速开始
 
@@ -27,37 +27,11 @@
 
 ## 配置选项
 
-系统配置文件位于`config/settings.json`，您可以根据需要调整以下参数：
-
-- `kafkaBrokers`: Kafka代理服务器地址。
-- `topicName`: Kafka主题名称。
-- `sparkMaster`: Spark集群的Master URL。
-- `brickDataPath`: brick格式数据存储路径。
-
 使用TimeMixer模型训练预测运行的示例代码位于`test.py`，您可以根据需要调整相关参数运行。
 
 模型参数文件位于`run2.py`，有相关参数的注释说明。
 
 ## 示例代码
-
-以下是使用系统进行故障预测的示例代码片段：
-
-```python
-# 假设您已经配置好环境并加载了TimeMixer模型
-from timemixer import TimeMixerPredictor
-
-# 初始化预测器
-predictor = TimeMixerPredictor(model_path='path/to/timemixer/model')
-
-# 加载brick格式数据
-data = load_brick_data('path/to/brick/data')
-
-# 进行故障预测
-predictions = predictor.predict(data)
-
-# 输出预测结果
-print(predictions)
-```
 
 以下是使用TimeMixer模型训练预测的示例代码片段：
 
