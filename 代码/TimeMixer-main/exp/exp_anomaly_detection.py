@@ -23,23 +23,27 @@ warnings.filterwarnings('ignore')
 
 
 
+# 定义异常检测实验类，继承自基础实验类 Exp_Basic
 class Exp_Anomaly_Detection(Exp_Basic):
+    # 初始化方法，接收实验参数 args
     def __init__(self, args): 
-        # 调用父类 Exp_Anomaly_Detection 的初始化方法，传入参数 args
+        # 调用父类 Exp_Basic 的初始化方法，传入参数 args
         super(Exp_Anomaly_Detection, self).__init__(args)
 
+    # 构建模型的方法
     def _build_model(self):
-        # 从模型字典中根据指定的模型名称构建模型实例，并将模型的所有参数转换为浮点类型
+        # 根据指定的模型名称，从模型字典中构建模型实例，并将模型的所有参数转换为浮点类型
         model = self.model_dict[self.args.model].Model(self.args).float()
 
-        # 如果配置了使用多 GPU 并且当前设备支持 GPU 计算，则使用 DataParallel 将模型并行化到指定的多个 GPU 设备上
+        # 判断是否配置了使用多 GPU 并且当前设备是否支持 GPU 计算
         if self.args.use_multi_gpu and self.args.use_gpu:
+            # 如果满足条件，则使用 DataParallel 将模型并行化到指定的多个 GPU 设备上
             model = nn.DataParallel(model, device_ids=self.args.device_ids)
     
         # 返回构建好的模型
         return model
 
-
+    # 获取数据的方法
     def _get_data(self, flag):
         # 调用数据提供函数 data_provider，根据传入的参数 args 和标志 flag 加载数据集和数据加载器
         data_set, data_loader = data_provider(self.args, flag)
@@ -47,22 +51,25 @@ class Exp_Anomaly_Detection(Exp_Basic):
         # 返回加载好的数据集和数据加载器
         return data_set, data_loader
 
-
+    # 选择优化器的方法
     def _select_optimizer(self):
         # 使用 Adam 优化器，并设置学习率为配置中的学习率，针对模型的参数进行优化
         model_optim = optim.Adam(self.model.parameters(), lr=self.args.learning_rate)
+        
         # 返回配置好的优化器
         return model_optim
 
+    # 选择损失函数的方法
     def _select_criterion(self):
         # 选择均方误差损失函数 (MSELoss) 作为模型的损失函数
         criterion = nn.MSELoss()
+        
         # 返回配置好的损失函数
         return criterion
 
-
+    # 验证模型的方法
     def vali(self, vali_data, vali_loader, criterion):
-        # 初始化总损失列表，用于存储每个批次的损失
+        # 初始化总损失列表，用于存储每个批次的损失值
         total_loss = []
     
         # 将模型设置为评估模式，以禁用 dropout 等训练时特定的层
@@ -70,7 +77,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
     
         # 在验证过程中不需要计算梯度，因此使用 no_grad 来节省内存并加速计算
         with torch.no_grad():
-            # 遍历验证数据加载器中的每个批次
+            # 遍历验证数据加载器中的每个批次数据
             for i, (batch_x, _) in enumerate(vali_loader):
                 # 将输入数据转换为浮点型并移动到指定的设备上（如 GPU）
                 batch_x = batch_x.float().to(self.device)
@@ -86,8 +93,9 @@ class Exp_Anomaly_Detection(Exp_Basic):
                 pred = outputs.detach()
                 true = batch_x.detach()
 
-                # 计算当前批次的损失
+                # 使用传入的损失函数计算当前批次的损失
                 loss = criterion(pred, true)
+                
                 # 将损失值添加到总损失列表中
                 total_loss.append(loss.item())
     
@@ -97,12 +105,14 @@ class Exp_Anomaly_Detection(Exp_Basic):
         # 恢复模型为训练模式
         self.model.train()
     
-        # 返回验证集上的平均损失
+        # 返回验证集上的平均损失值
         return total_loss
 
 
-    def train(self, setting):
-        # 获取训练、验证和测试数据集及其对应的数据加载器
+
+    # 定义训练方法，接收参数 setting（实验设置）
+def train(self, setting):
+        # 获取训练集、验证集和测试集及其对应的数据加载器
         train_data, train_loader = self._get_data(flag='train')
         vali_data, vali_loader = self._get_data(flag='val')
         test_data, test_loader = self._get_data(flag='test')
@@ -115,7 +125,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
         # 记录当前时间，用于计算训练速度
         time_now = time.time()
 
-        # 计算每个 epoch 的训练步数
+        # 计算每个 epoch 的训练步数（即批次数量）
         train_steps = len(train_loader)
 
         # 初始化早停机制，设定耐心值和日志输出选项
@@ -132,7 +142,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
                                             epochs=self.args.train_epochs,
                                             max_lr=self.args.learning_rate)
 
-        # 开始训练循环
+        # 开始训练循环，遍历每个 epoch
         for epoch in range(self.args.train_epochs):
             iter_count = 0  # 迭代计数器
             train_loss = []  # 用于记录每个批次的训练损失
@@ -158,7 +168,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
                 f_dim = -1 if self.args.features == 'MS' else 0
                 outputs = outputs[:, :, f_dim:]
 
-                # 计算当前批次的损失
+                # 计算当前批次的损失，并将其记录到 train_loss 列表中
                 loss = criterion(outputs, batch_x)
                 train_loss.append(loss.item())
 
@@ -169,8 +179,8 @@ class Exp_Anomaly_Detection(Exp_Basic):
                     speed = (time.time() - time_now) / iter_count
                     left_time = speed * ((self.args.train_epochs - epoch) * train_steps - i)
                     print('\tspeed: {:.4f}s/iter; left time: {:.4f}s'.format(speed, left_time))
-                    iter_count = 0
-                    time_now = time.time()
+                    iter_count = 0  # 重置迭代计数器
+                    time_now = time.time()  # 更新当前时间
 
                 # 反向传播计算梯度并更新模型参数
                 loss.backward()
@@ -214,10 +224,9 @@ class Exp_Anomaly_Detection(Exp_Basic):
         # 返回训练好的模型
         return self.model
 
-        
-
-    def test(self, setting, test=0):
-        # 获取测试和训练数据集及其加载器
+# 定义测试方法，接收参数 setting（实验设置）和 test（测试标志）
+def test(self, setting, test=0):
+        # 获取测试集和训练集及其加载器
         test_data, test_loader = self._get_data(flag='test')
         train_data, train_loader = self._get_data(flag='train')
 
@@ -233,42 +242,57 @@ class Exp_Anomaly_Detection(Exp_Basic):
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
-        self.model.eval()  # 将模型设置为评估模式
-        self.anomaly_criterion = nn.MSELoss(reduce=False)  # 定义用于异常检测的损失函数（不进行reduce操作）
+        # 将模型设置为评估模式
+        self.model.eval()
+        # 定义用于异常检测的损失函数（不进行reduce操作）
+        self.anomaly_criterion = nn.MSELoss(reduce=False)  
 
         # (1) 在训练集上统计异常得分
         with torch.no_grad():  # 禁用梯度计算
+            # 遍历训练数据加载器中的每个批次
             for i, (batch_x, batch_y) in enumerate(train_loader):
                 batch_x = batch_x.float().to(self.device)  # 将数据转换为浮点型并移动到指定设备上
                 outputs = self.model(batch_x, None, None, None)  # 模型进行重构
-                score = torch.mean(self.anomaly_criterion(batch_x, outputs), dim=-1)  # 计算每个样本的平均异常得分
+                # 计算每个样本的平均异常得分
+                score = torch.mean(self.anomaly_criterion(batch_x, outputs), dim=-1)
                 score = score.detach().cpu().numpy()  # 将得分转换为 NumPy 数组
                 attens_energy.append(score)  # 将得分添加到列表中
 
-        attens_energy = np.concatenate(attens_energy, axis=0).reshape(-1)  # 将所有得分拼接为一个向量
-        train_energy = np.array(attens_energy)  # 转换为 NumPy 数组保存训练集的异常得分
+        # 将所有得分拼接为一个向量
+        attens_energy = np.concatenate(attens_energy, axis=0).reshape(-1)  
+        # 转换为 NumPy 数组保存训练集的异常得分
+        train_energy = np.array(attens_energy)  
 
         # (2) 寻找阈值
         attens_energy = []  # 重置异常得分列表
         test_labels = []  # 用于存储测试集的标签
+        # 遍历测试数据加载器中的每个批次
         for i, (batch_x, batch_y) in enumerate(test_loader):
             batch_x = batch_x.float().to(self.device)  # 将测试数据转换为浮点型并移动到指定设备上
             outputs = self.model(batch_x, None, None, None)  # 模型进行重构
-            score = torch.mean(self.anomaly_criterion(batch_x, outputs), dim=-1)  # 计算每个样本的平均异常得分
+            # 计算每个样本的平均异常得分
+            score = torch.mean(self.anomaly_criterion(batch_x, outputs), dim=-1)
             score = score.detach().cpu().numpy()  # 将得分转换为 NumPy 数组
             attens_energy.append(score)  # 将得分添加到列表中
             test_labels.append(batch_y)  # 添加对应的测试标签
 
-        attens_energy = np.concatenate(attens_energy, axis=0).reshape(-1)  # 将所有测试集的异常得分拼接为一个向量
-        test_energy = np.array(attens_energy)  # 转换为 NumPy 数组保存测试集的异常得分
-        combined_energy = np.concatenate([train_energy, test_energy], axis=0)  # 将训练集和测试集的异常得分组合在一起
-        threshold = np.percentile(combined_energy, 100 - self.args.anomaly_ratio)  # 根据异常比例计算阈值
+        # 将所有测试集的异常得分拼接为一个向量
+        attens_energy = np.concatenate(attens_energy, axis=0).reshape(-1)  
+        # 转换为 NumPy 数组保存测试集的异常得分
+        test_energy = np.array(attens_energy)  
+        # 将训练集和测试集的异常得分组合在一起
+        combined_energy = np.concatenate([train_energy, test_energy], axis=0)  
+        # 根据异常比例计算阈值
+        threshold = np.percentile(combined_energy, 100 - self.args.anomaly_ratio)  
         print("Threshold :", threshold)
 
         # (3) 在测试集上进行评估
-        pred = (test_energy > threshold).astype(int)  # 将得分高于阈值的样本预测为异常（1），否则为正常（0）
-        test_labels = np.concatenate(test_labels, axis=0).reshape(-1)  # 将测试标签拼接为一个向量
-        test_labels = np.array(test_labels)  # 转换为 NumPy 数组
+        # 将得分高于阈值的样本预测为异常（1），否则为正常（0）
+        pred = (test_energy > threshold).astype(int)  
+        # 将测试标签拼接为一个向量
+        test_labels = np.concatenate(test_labels, axis=0).reshape(-1)  
+        # 转换为 NumPy 数组
+        test_labels = np.array(test_labels)  
         gt = test_labels.astype(int)  # 将标签转换为整数类型
 
         print("pred:   ", pred.shape)
@@ -298,4 +322,5 @@ class Exp_Anomaly_Detection(Exp_Basic):
         f.close()
 
         return  # 返回函数，结束测试过程
+
 
