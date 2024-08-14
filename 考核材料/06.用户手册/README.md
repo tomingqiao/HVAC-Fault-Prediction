@@ -34,9 +34,9 @@
 - `sparkMaster`: Spark集群的Master URL。
 - `brickDataPath`: brick格式数据存储路径。
 
-使用TimeMixer模型训练预测运行的示例代码位于`/text.py`，您可以根据需要调整相关参数运行。
+使用TimeMixer模型训练预测运行的示例代码位于`test.py`，您可以根据需要调整相关参数运行。
 
-模型参数文件位于`/cs.py`，有相关参数的注释说明。
+模型参数文件位于`run2.py`，有相关参数的注释说明。
 
 ## 示例代码
 
